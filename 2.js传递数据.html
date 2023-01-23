@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Document</title>
+  </head>
+  <body>
+    <canvas id="cvs" width="400" height="400" style="border: dashed 1px red">
+      你的浏览器不支持画布元素
+    </canvas>
+    <script type="module">
+      import { loadShader, initShaders } from './utils.js'
+      const cvs = document.getElementById('cvs')
+      const gl = cvs.getContext('webgl')
+      const VSHADER_SOURCE = `
+      attribute vec2 a_position;
+      uniform float a_size;
+      varying vec2 v_xx;
+      void main() {
+        v_xx=a_position;
+        gl_Position = vec4(a_position, 0.0, 1.0);
+        gl_PointSize = a_size;
+      }`
+      const FSHADER_SOURCE = `
+      precision mediump float;
+      uniform vec3 u_color;
+      varying vec2 v_xx;
+      void main() {
+        gl_FragColor = vec4(v_xx, 0.0, 1.0);
+      }`
+      if (initShaders(gl, VSHADER_SOURCE, FSHADER_SOURCE)) {
+        gl.clearColor(0.0, 0.0, 0.0, 1.0)
+        gl.clear(gl.COLOR_BUFFER_BIT)
+        let x = 0,
+          y = 0,
+          n = 1000
+        for (let i = 0; i < n; i++) {
+          let r = i / n
+          x = r * Math.cos(i)
+          y = r * Math.sin(i)
+          /* 
+          attribute类型的传递只能是 js 传递给 vertexShader 
+          uniform类型的传递可以是 js 传递给 vertexShader 和 fragmentShader
+          Varying类型的传递只能是 vertexShader 传递给 fragmentShader
+          */
+          // 获取指定program下a_position的变量地址
+          const a_position = gl.getAttribLocation(gl.program, 'a_position')
+          // gl.vertexAttrib2f(location, x, y)
+          gl.vertexAttrib2fv(a_position, new Float32Array([x, y]))
+          const a_size = gl.getUniformLocation(gl.program, 'a_size')
+          gl.uniform1f(a_size, r * 10)
+          const u_color = gl.getUniformLocation(gl.program, 'u_color')
+          gl.uniform3f(u_color, 0.0, 1.0, 0.0)
+          gl.drawArrays(gl.POINTS, 0, 1)
+        }
+      } else {
+        console.log('error')
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Document</title>
+  </head>
+  <body>
+    <canvas id="cvs" width="400" height="400" style="border: dashed 1px red">
+      你的浏览器不支持画布元素
+    </canvas>
+    <script type="module">
+      import { loadShader, initShaders } from './utils.js'
+      const cvs = document.getElementById('cvs')
+      const gl = cvs.getContext('webgl')
+      const VSHADER_SOURCE = `
+      attribute vec3 a_position;
+      attribute vec2 a_uv;
+      varying vec2 v_uv;
+      void main() {
+        gl_Position = vec4(a_position, 1.0);
+        v_uv=a_uv;
+      }`
+      const FSHADER_SOURCE = `
+      precision mediump float;
+      varying vec2 v_uv;
+      uniform sampler2D u_sampler1;
+      uniform sampler2D u_sampler2;
+
+      void main() {
+        vec4 color1 = texture2D(u_sampler1,v_uv);
+        vec4 color2 = texture2D(u_sampler2,v_uv);
+        gl_FragColor = color1 * color2;
+        // gl_FragColor = color1 * (vec4(1.0, 1.0, 1.0, 2.0) - color2);
+      }`
+      let loadingImg = 0
+      if (initShaders(gl, VSHADER_SOURCE, FSHADER_SOURCE)) {
+        initVertexBuffers(gl)
+        initTextrues(gl, 'cat_400x400.jpg', 'u_sampler1', 0)
+        initTextrues(gl, 'leaves.jpg', 'u_sampler2', 1)
+      } else {
+        console.log('error')
+      }
+      function initVertexBuffers(gl) {
+        // WebGL坐标系四个顶点
+        let vertices = new Float32Array([
+          -0.5, -0.5, 0.0, 0.5, -0.5, 0.0, 0.5, 0.5, 0.0, -0.5, 0.5, 0.0,
+        ])
+        let FSIZE = vertices.BYTES_PER_ELEMENT
+        let positionBuffer = gl.createBuffer()
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer)
+        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW)
+        const a_position = gl.getAttribLocation(gl.program, 'a_position')
+        gl.vertexAttribPointer(a_position, 3, gl.FLOAT, false, 3 * FSIZE, 0)
+        gl.enableVertexAttribArray(a_position)
+        // 贴图坐标系四个顶点
+        let uvs = new Float32Array([0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0])
+        let uvsBuffer = gl.createBuffer()
+        gl.bindBuffer(gl.ARRAY_BUFFER, uvsBuffer)
+        gl.bufferData(gl.ARRAY_BUFFER, uvs, gl.STATIC_DRAW)
+        const a_uv = gl.getAttribLocation(gl.program, 'a_uv')
+        gl.vertexAttribPointer(a_uv, 2, gl.FLOAT, false, 2 * FSIZE, 0)
+        gl.enableVertexAttribArray(a_uv)
+      }
+      function draw(gl) {
+        gl.clearColor(0.0, 0.0, 0.0, 1.0)
+        gl.clear(gl.COLOR_BUFFER_BIT)
+
+        gl.drawArrays(gl.TRIANGLE_FAN, 0, 4)
+        gl.drawArrays(gl.POINTS, 0, 4)
+      }
+      function initTextrues(gl, url, glslVar, textureNum) {
+        let texture = gl.createTexture()
+        const u_sampler = gl.getUniformLocation(gl.program, glslVar)
+        const image = new Image()
+        image.src = `./src/${url}`
+        loadingImg += 1
+        image.onload = function () {
+          // 翻转图片y轴
+          gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
+          // 激活第0个单元用于贴图
+          gl.activeTexture(gl[`TEXTURE${textureNum}`])
+          // 最多多少贴图单元
+          console.log(gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS))
+          // 绑定texture
+          gl.bindTexture(gl.TEXTURE_2D, texture)
+          // 设置贴图参数
+          /*  
+          纹理参数	              填充模式	  默认值
+          gl.TEXTURE_MAG_FILTER	纹理放大	  gl.LINEAR
+          gl.TEXTURE_MIN_FILTER	纹理缩小	  gl.NEAREST_MIPMAP_LINEAR
+          gl.TEXTURE_WRAP_S	    水平填充	  gl.REPEAT
+          gl.TEXTURE_WRAP_T	    竖直填充	  gl.REPEAT 
+          gl.NEAREST	          纹理坐标乘以纹理图片需要缩放的倍数得到像素的选取坐标，选择坐标对应的像素，多余的舍弃掉
+          gl.LINEAR	            选择纹理坐标对应的像素周围的像素颜色值进行加权平均，相比gl.NEAREST的效果更好，付出的代价是更消耗硬件资源
+          gl.REPEAT	        平铺方式
+          gl.MIRRORED_REPEAT	  镜像方式
+          gl.CLAMP_TO_EDGE	    绘制区域边缘使用贴图的部分
+          */
+          // 小的图片在形状上的填充模式——x和y方向
+          // 如果贴图图片的尺寸不是2^n必须要将x、y的填充模式设置为CLAMP_TO_EDGE才能贴上
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+          // 大的图片贴到小的形状上
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+          // 小的图片贴到大的形状上
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+          // 将图像上传到纹理
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image)
+          gl.uniform1i(u_sampler, textureNum)
+          loadingImg -= 1
+          if (loadingImg == 0) draw(gl)
+        }
+      }
+    </script>
+  </body>
+</html>

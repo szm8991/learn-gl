@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Document</title>
+  </head>
+  <body>
+    <canvas id="cvs" width="400" height="400" style="border: dashed 1px red">
+      你的浏览器不支持画布元素
+    </canvas>
+    <script type="module">
+      import { loadShader, initShaders, initVertexBuffers } from './utils.js'
+      import { mat4 } from './lib/gl_martix/esm/index.js'
+
+      const cvs = document.getElementById('cvs')
+      const gl = cvs.getContext('webgl')
+      const VSHADER_SOURCE = `
+      attribute vec2 a_position;
+      uniform mat4 u_matrix;
+      void main() {
+        gl_Position = u_matrix * vec4(a_position, 0.0, 1.0);
+        gl_PointSize = 10.0;
+      }`
+      const FSHADER_SOURCE = `
+      precision mediump float;
+      void main() {
+        gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0);
+      }`
+      if (initShaders(gl, VSHADER_SOURCE, FSHADER_SOURCE)) {
+        initVertexBuffers(gl, [-0.5, -0.5, 0.5, -0.5, 0.0, 0.5], {
+          a_position: { size: 2, normalized: false, stried: 2, offset: 0 },
+        })
+        let scaleMartix = mat4.create()
+        mat4.fromScaling(scaleMartix, [2, 2, 1])
+        function tick() {
+          const u_matrix = gl.getUniformLocation(gl.program, 'u_matrix')
+          gl.uniformMatrix4fv(u_matrix, false, scaleMartix)
+          // requestAnimationFrame(tick)
+          gl.clearColor(0.0, 0.0, 0.0, 1.0)
+          gl.clear(gl.COLOR_BUFFER_BIT)
+          gl.drawArrays(gl.TRIANGLE_FAN, 0, 3)
+        }
+        tick()
+      } else {
+        console.log('error')
+      }
+    </script>
+  </body>
+</html>

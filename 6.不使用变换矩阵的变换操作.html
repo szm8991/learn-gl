@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Document</title>
+  </head>
+  <body>
+    <canvas id="cvs" width="400" height="400" style="border: dashed 1px red">
+      你的浏览器不支持画布元素
+    </canvas>
+    <script type="module">
+      import { loadShader, initShaders, initVertexBuffers } from './utils.js'
+      const cvs = document.getElementById('cvs')
+      const gl = cvs.getContext('webgl')
+      const VSHADER_SOURCE = `
+      attribute vec2 a_position;
+      uniform float u_cosB;
+      uniform float u_sinB;
+      void main() {
+        float x1 = a_position.x;
+        float y1 = a_position.y;
+        float z1 = 0.0;
+
+        float x2 = x1 * u_cosB - y1 * u_sinB;
+        float y2 = x1 * u_sinB + y1 * u_cosB;
+        float z2 = 0.0;
+        gl_Position = vec4(x2,y2,z2, 1.0);
+        gl_PointSize = 10.0;
+      }`
+      const FSHADER_SOURCE = `
+      precision mediump float;
+      void main() {
+        gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0);
+      }`
+      if (initShaders(gl, VSHADER_SOURCE, FSHADER_SOURCE)) {
+        initVertexBuffers(gl, [-0.5, -0.5, 0.5, -0.5, 0.0, 0.5], {
+          a_position: { size: 2, normalized: false, stried: 2, offset: 0 },
+        })
+
+        let tx = 0.5,
+          speed_x = 0.01,
+          ty = 0.5,
+          speed_y = 0.02,
+          deg = 0
+        function tick() {
+          deg += 0.5
+          tx += speed_x
+          ty += speed_y
+          if (tx > 0.5 || tx < -0.5) speed_x *= -1
+          if (ty > 0.5 || ty < -0.5) speed_y *= -1
+          const u_cosB = gl.getUniformLocation(gl.program, 'u_cosB')
+          gl.uniform1f(u_cosB, Math.cos((deg / 180) * Math.PI))
+          const u_sinB = gl.getUniformLocation(gl.program, 'u_sinB')
+          gl.uniform1f(u_sinB, Math.sin((deg / 180) * Math.PI))
+          requestAnimationFrame(tick)
+          gl.clearColor(0.0, 0.0, 0.0, 1.0)
+          gl.clear(gl.COLOR_BUFFER_BIT)
+          gl.drawArrays(gl.TRIANGLE_FAN, 0, 3)
+        }
+        tick()
+      } else {
+        console.log('error')
+      }
+    </script>
+  </body>
+</html>
